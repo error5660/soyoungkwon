@@ -2285,6 +2285,9 @@ function announceFight() {
 // ================= 온라인 방 =================
 const isHost = () => !!(roomMeta && net && roomMeta.host === net.uid);
 const randCode = () => Array.from({ length: 4 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join('');
+const errText = (e) => (/PERMISSION_DENIED/i.test(String(e?.code || e?.message || e))
+  ? '권한 거절됨: Firebase 규칙이 최신이 아니에요. database.rules.json 내용을 규칙 탭에 다시 게시하세요.'
+  : (e?.message || String(e)));
 const roomMode = () => (roomMeta && roomMeta.max === 2 ? '3판 2선' : '최후의 1인');
 
 function joinFromInput() {
@@ -2317,7 +2320,7 @@ async function findMatch() {
         await new Promise((r) => setTimeout(r, 700));
       }
     }
-  } catch (e) { $('#err').textContent = '매칭 실패: ' + (e.message || e); }
+  } catch (e) { $('#err').textContent = '매칭 실패: ' + errText(e); }
   $('#btnMatch').disabled = false;
 }
 
@@ -2362,7 +2365,7 @@ async function startOnline(code, create = null, quiet = false) {
     if (create?.ranked) net.cancelMatch();
     await net.leave().catch(() => {});
     startDemo();
-    if (!quiet) $('#err').textContent = '입장 실패: ' + (err.message || err);
+    if (!quiet) $('#err').textContent = '입장 실패: ' + errText(err);
     $('#btnJoin').disabled = $('#btnCreate').disabled = false;
     return false;
   }
