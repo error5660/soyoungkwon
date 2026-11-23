@@ -35,6 +35,8 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; margin: 0 2px; b
 /* ---------- 타이틀 ---------- */
 .screen { position: fixed; inset: 0; display: flex; align-items: center; padding: 16px 16px 16px 6vw; z-index: 20; overflow-y: auto;
   background: linear-gradient(90deg, rgba(6,3,16,.88) 0%, rgba(6,3,16,.55) 38%, rgba(6,3,16,0) 65%); }
+/* 세로 가운데는 auto 여백으로: align-items:center 는 내용이 길면 위쪽이 스크롤 밖으로 잘림 */
+.screen > .panel { margin-block: auto; }
 #menu.screen, #shop.screen, #room.screen { justify-content: center; padding: 16px; background: rgba(6,3,16,.6); backdrop-filter: blur(4px); }
 .panel { width: min(430px, 100%); background: var(--panel); border: 1px solid var(--line); padding: 28px 26px 22px;
   backdrop-filter: blur(12px); box-shadow: 0 30px 80px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.08);
