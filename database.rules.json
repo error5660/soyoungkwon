@@ -43,13 +43,21 @@
           ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= (data.exists() ? data.val() : 0) + 30"
         },
         "skill": {
-          "name": {
-            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 10 && (data.val() === newData.val() || newData.parent().parent().child('gold').val() === data.parent().parent().child('gold').val() - 500)"
-          },
-          "img": {
-            ".validate": "newData.isString() && newData.val().beginsWith('data:image/png;base64,') && newData.val().length < 200000 && (data.val() === newData.val() || newData.parent().parent().child('gold').val() === data.parent().parent().child('gold').val() - 500)"
-          },
+          "name": { ".validate": "data.val() === newData.val()" },
+          "img": { ".validate": "data.val() === newData.val()" },
           "$other": { ".validate": false }
+        },
+        "skills": {
+          "$id": {
+            ".validate": "$id === 's1' || $id === 's2'",
+            "name": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 10 && (data.val() === newData.val() || newData.parent().parent().parent().child('gold').val() === data.parent().parent().parent().child('gold').val() - 500)"
+            },
+            "img": {
+              ".validate": "newData.isString() && newData.val().beginsWith('data:image/png;base64,') && newData.val().length < 200000 && (data.val() === newData.val() || newData.parent().parent().parent().child('gold').val() === data.parent().parent().parent().child('gold').val() - 500)"
+            },
+            "$other": { ".validate": false }
+          }
         },
         "skins": {
           "$id": {
