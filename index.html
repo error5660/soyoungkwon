@@ -35,7 +35,7 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; margin: 0 2px; b
 /* ---------- 타이틀 ---------- */
 .screen { position: fixed; inset: 0; display: flex; align-items: center; padding: 16px 16px 16px 6vw; z-index: 20; overflow-y: auto;
   background: linear-gradient(90deg, rgba(6,3,16,.88) 0%, rgba(6,3,16,.55) 38%, rgba(6,3,16,0) 65%); }
-#menu.screen, #shop.screen { justify-content: center; padding: 16px; background: rgba(6,3,16,.6); backdrop-filter: blur(4px); }
+#menu.screen, #shop.screen, #room.screen { justify-content: center; padding: 16px; background: rgba(6,3,16,.6); backdrop-filter: blur(4px); }
 .panel { width: min(430px, 100%); background: var(--panel); border: 1px solid var(--line); padding: 28px 26px 22px;
   backdrop-filter: blur(12px); box-shadow: 0 30px 80px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.08);
   clip-path: polygon(0 0, calc(100% - 26px) 0, 100% 26px, 100% 100%, 26px 100%, 0 calc(100% - 26px)); position: relative; }
@@ -207,6 +207,12 @@ body.touch #feed { top: 160px; }
 #cutin b { display: block; font: 64px var(--display); color: #fff; white-space: nowrap; text-shadow: 0 4px 0 #000, 0 0 24px var(--gold), 0 0 48px var(--red); }
 @keyframes cutin { 0% { transform: translateX(-100%) skewY(-4deg); opacity: 0; } 12% { transform: skewY(-4deg); opacity: 1; }
   80% { transform: skewY(-4deg) scale(1.05); opacity: 1; } 100% { transform: translateX(30%) skewY(-4deg); opacity: 0; } }
+.list-row { display: flex; align-items: center; gap: 8px; padding: 7px 10px; margin-bottom: 4px; background: rgba(5,3,14,.6); border-left: 3px solid var(--line); font-size: 13px; text-align: left; }
+.list-row b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list-row .btn { padding: 6px 12px; font-size: 13px; }
+.list-row.ready { border-left-color: #4be37a; }
+.list-row em { font-style: normal; font: 11px var(--tech); color: var(--muted); }
+.list-row.ready em { color: #4be37a; }
 .skins { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 #skinPick { justify-content: flex-start; }
 .skin { position: relative; width: 64px; height: 64px; padding: 0; border: 2px solid var(--line); background: rgba(5,3,14,.7); cursor: pointer; overflow: hidden; }
@@ -237,10 +243,18 @@ body.touch #feed { top: 160px; }
         <p id="cfgNote" class="note" hidden>온라인 대전은 <b>js/firebase-config.js</b> 설정 후 열려요 (README 참고). 지금은 연습 모드로 즐겨보세요!</p>
         <div id="lobby" hidden>
           <div class="me-row"><img id="meAvatar" alt="" hidden referrerpolicy="no-referrer"><span id="meName"></span><span id="gold" class="gold"></span><button id="btnLogout" class="link">로그아웃</button></div>
-          <label>방 코드</label>
-          <div class="row"><input id="roomInput" maxlength="12" autocomplete="off"><button id="btnJoin" class="btn primary">입장 ▶</button></div>
-          <p class="note">같은 방 코드로 들어온 친구들과 난투 (최대 8명)</p>
-          <button id="btnMatch" class="btn primary wide">매칭 찾기 ▶ 1:1 · 3 K.O. 승리 = +10G</button>
+          <label>방 만들기</label>
+          <div class="row">
+            <select id="roomPublic" aria-label="공개 여부"><option value="1">공개 방</option><option value="0">비공개 방 (코드)</option></select>
+            <select id="roomMax" aria-label="인원"><option value="2">2명 · 3판 2선</option><option value="3">3명</option><option value="4">4명</option><option value="5">5명</option><option value="6">6명</option><option value="7">7명</option><option value="8">8명</option></select>
+          </div>
+          <button id="btnCreate" class="btn primary wide">방 만들기 ▶</button>
+          <p class="note">3명 이상은 마지막까지 살아남은 1명이 승리. 인원이 다 모여 모두 준비하면 시작!</p>
+          <label for="roomInput">비공개 방 코드 (영어 4자리)</label>
+          <div class="row"><input id="roomInput" maxlength="4" autocomplete="off"><button id="btnJoin" class="btn">입장 ▶</button></div>
+          <label>공개 방 목록</label>
+          <div id="roomList"><p class="note">불러오는 중...</p></div>
+          <button id="btnMatch" class="btn primary wide">매칭 찾기 ▶ 1:1 · 3판 2선 승리 = +10G</button>
           <button id="btnShop" class="btn wide">상점 · 커스텀 기술 (500G)</button>
         </div>
       </div>
@@ -313,6 +327,17 @@ body.touch #feed { top: 160px; }
       <button id="btnResume" class="btn primary wide">계속하기</button>
       <button id="btnSound" class="btn wide">소리: 켜짐</button>
       <button id="btnLeave" class="btn danger wide">나가기</button>
+    </div>
+  </div>
+
+  <div id="room" class="screen" hidden>
+    <div class="panel small">
+      <h2 id="roomTitle">ROOM</h2>
+      <p id="roomInfo" class="note"></p>
+      <div id="roomPlayers"></div>
+      <button id="btnReady" class="btn primary wide">준비</button>
+      <button id="btnInvite" class="btn wide">초대 링크 복사</button>
+      <button id="btnRoomLeave" class="btn danger wide">나가기</button>
     </div>
   </div>
 
@@ -494,14 +519,23 @@ class FireNet {
 
   async signOut() { await this.A.signOut(this.auth); this.user = null; }
 
-  // 방 설정(낙사 여부, 매칭 여부)은 처음 들어온 사람이 정함
-  async join(room, initial, handlers, meta) {
-    const { ref, get, set, remove, onDisconnect, onChildAdded, onChildChanged, onChildRemoved } = this.D;
+  // create(방 설정)를 넘기면 방을 새로 만들고 내가 방장. 방장이 나가면 방 전체가 지워짐
+  async join(room, initial, handlers, create) {
+    const { ref, get, set, remove, onDisconnect, onValue, onChildAdded, onChildChanged, onChildRemoved } = this.D;
     const metaRef = ref(this.db, `rooms/${room}/meta`);
-    const ms = await get(metaRef);
-    if (!ms.exists()) await set(metaRef, meta);
-    const roomMeta = ms.exists() ? ms.val() : meta;
-    const max = roomMeta.ranked ? 2 : MAX_PLAYERS;
+    let roomMeta;
+    if (create) {
+      await set(metaRef, create); // 같은 코드의 방이 이미 있으면 규칙이 거절함
+      roomMeta = create;
+      this.hostRoom = room;
+      await onDisconnect(ref(this.db, `rooms/${room}`)).remove();
+    } else {
+      const ms = await get(metaRef);
+      if (!ms.exists()) throw new Error('없는 방이에요. 코드를 확인하세요.');
+      roomMeta = ms.val();
+      if (roomMeta.state !== 'lobby') throw new Error('이미 게임이 시작된 방이에요.');
+    }
+    const max = Math.min(MAX_PLAYERS, roomMeta.max || 2);
     this.room = room;
     const playersRef = ref(this.db, `rooms/${room}/players`);
     const snap = await get(playersRef);
@@ -525,9 +559,22 @@ class FireNet {
         remove(s.ref).catch(() => {});
         if (v && typeof v === 'object') handlers.event(v);
       }),
+      onValue(metaRef, (s) => handlers.meta(s.val())),
     ];
     return roomMeta;
   }
+
+  setMeta(patch) { return this.D.update(this.D.ref(this.db, `rooms/${this.room}/meta`), patch); }
+
+  // 공개 방 목록: lobby/<코드> 에 방 정보를 올림 (null 이면 내림)
+  async setLobby(entry) {
+    const r = this.D.ref(this.db, `lobby/${this.room}`);
+    if (!entry) { await this.D.onDisconnect(r).cancel().catch(() => {}); return this.D.remove(r).catch(() => {}); }
+    await this.D.onDisconnect(r).remove();
+    return this.D.set(r, entry);
+  }
+
+  watchLobby(cb) { return this.D.onValue(this.D.ref(this.db, 'lobby'), (s) => cb(s.val() || {}), () => cb({})); }
 
   // 맵 종류별 대기 슬롯 하나: 비어 있으면 내가 기다리고, 누가 있으면 그 방으로 들어감
   async findMatch(noFall) {
@@ -611,7 +658,13 @@ class FireNet {
         onDisconnect(this.inboxRef).cancel().catch(() => {}),
       ]);
     }
-    this.myRef = null; this.inboxRef = null; this.room = null;
+    if (this.hostRoom) {
+      const r = this.D.ref(this.db, `rooms/${this.hostRoom}`);
+      await this.setLobby(null);
+      await onDisconnect(r).cancel().catch(() => {});
+      await remove(r).catch(() => {});
+    }
+    this.myRef = null; this.inboxRef = null; this.room = null; this.hostRoom = null;
   }
 }
 return { MAX_PLAYERS, SKILL_PRICE, isConfigured, FireNet };
@@ -1006,7 +1059,7 @@ class Fighter {
         break;
       case 'ko':
         if (grounded) this.friction(dt, 6);
-        if (this.stateT >= RESPAWN_T) this.respawn();
+        if (this.stateT >= RESPAWN_T && !world.noRespawn) this.respawn(); // 온라인 방: 라운드 끝날 때까지 탈락
         break;
     }
 
@@ -1840,8 +1893,10 @@ let menuOpen = false, hitstop = 0, shake = 0, fovKick = 0, slowT = 0;
 let combo = 0, comboT = 0, comboDmg = 0;
 let colorIdx = Math.min(COLORS.length - 1, Math.max(0, parseInt(store.get('pf_color', '0'), 10) || 0));
 const playing = () => mode === 'practice' || mode === 'online';
-const WIN_KO = 3, WIN_GOLD = 10;
-let ranked = false, waiting = false, matchOver = false, endTimer = 0, gold = 0, mySkill = null;
+const WIN_GOLD = 10, ROUND_WINS = 2;
+let ranked = false, endTimer = 0, gold = 0, mySkill = null;
+// 온라인 방 상태: phase = lobby(대기실) | fight | pause(라운드 사이) | done
+let roomMeta = null, phase = 'lobby', myReady = false, curRound = 0, roundT = 0, hostBusy = false, lastRw = '', lobbyEntry = null;
 const skills = new Map(); // 파이터 id → { name, img }
 // 다른 사람이 올린 값이므로 PNG data URL / 10자 이내만 받음
 function cleanSkill(s) {
@@ -1892,6 +1947,7 @@ const tag = (f) => f ? `<b style="color:${hex(f.color)}">${esc(f.name)}</b>` : '
 const world = {
   fighters,
   noFall: false,
+  noRespawn: false,
   // 커스텀 기술 컷인: 쓴 사람의 기술명 + 사진을 모두의 화면에 띄움
   onSkill(f) {
     const s = skills.get(f.id);
@@ -2055,7 +2111,7 @@ function cycleLock() {
 function readInput() {
   const k = (c) => keys.has(c), p = (c) => pressed.has(c);
   const inp = { mx: 0, mz: 0, light: false, heavy: false, guard: false, guardPressed: false, jump: false, dodge: false, skill: false };
-  if (!menuOpen) {
+  if (!menuOpen && !(mode === 'online' && phase !== 'fight')) {
     inp.skill = p('KeyE') || !!touch.pressed.skill;
     let f = (k('KeyW') || k('ArrowUp') ? 1 : 0) - (k('KeyS') || k('ArrowDown') ? 1 : 0) + touch.y;
     let r = (k('KeyD') || k('ArrowRight') ? 1 : 0) - (k('KeyA') || k('ArrowLeft') ? 1 : 0) + touch.x;
@@ -2144,7 +2200,7 @@ function updateBars(dt) {
   $('#stDodge').classList.toggle('off', me.dodgeCD > 0);
   $('#stCounter').classList.toggle('off', !(me.counterT > 0));
   const ko = $('#respawn');
-  if (me.state === 'ko') { ko.hidden = false; ko.textContent = `RESPAWN ${Math.max(0, 3.2 - me.stateT).toFixed(1)}`; }
+  if (me.state === 'ko') { ko.hidden = false; ko.textContent = world.noRespawn ? '탈락 · 관전 중' : `RESPAWN ${Math.max(0, 3.2 - me.stateT).toFixed(1)}`; }
   else ko.hidden = true;
 }
 function updateRoster() {
@@ -2158,7 +2214,8 @@ function updateRoster() {
 function clearWorld() {
   for (const f of fighters.values()) f.dispose();
   fighters.clear(); bots = []; me = null; lockId = null; mode = null;
-  skills.clear(); ranked = waiting = matchOver = false; clearTimeout(endTimer); setMap(false);
+  skills.clear(); ranked = false; clearTimeout(endTimer); setMap(false);
+  roomMeta = null; phase = 'lobby'; myReady = false; curRound = 0; lastRw = ''; lobbyEntry = null; world.noRespawn = false;
   $('#cutin').hidden = true;
   combo = 0; comboT = 0; $('#combo').classList.remove('show');
   $('#feed').innerHTML = '';
@@ -2170,6 +2227,7 @@ function showScreen(name) {
   $('#hud').hidden = name !== 'game';
   $('#touch').hidden = !(name === 'game' && isTouch);
   $('#menu').hidden = true; menuOpen = false;
+  $('#room').hidden = true;
 }
 
 function addBot(i, lvl, color, name) {
@@ -2222,10 +2280,25 @@ function announceFight() {
   setTimeout(() => { center('FIGHT!', 'fight', 900); screenFlash('white'); sfx.play('heavy', 0.6); }, 750);
 }
 
+// ================= 온라인 방 =================
+const isHost = () => !!(roomMeta && net && roomMeta.host === net.uid);
+const randCode = () => Array.from({ length: 4 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join('');
+const roomMode = () => (roomMeta && roomMeta.max === 2 ? '3판 2선' : '최후의 1인');
+
 function joinFromInput() {
-  const code = ($('#roomInput').value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
-  if (!code) { $('#err').textContent = '방 코드를 입력하세요.'; return; }
-  startOnline(code, { ranked: false, noFall: $('#mapType').value === 'safe' });
+  const code = ($('#roomInput').value || '').toUpperCase().replace(/[^A-Z]/g, '');
+  if (code.length !== 4) { $('#err').textContent = '방 코드는 영어 4자리예요.'; return; }
+  startOnline(code);
+}
+
+function createRoom() {
+  if (!net || !user) return;
+  const isPublic = $('#roomPublic').value === '1';
+  // shortcut: 코드가 기존 방과 겹치면(약 45만 분의 1) 입장 실패로 끝남, 방이 아주 많아지면 재시도 추가
+  startOnline(randCode(), {
+    host: net.uid, name: `${myName()}의 방`, isPublic, max: +$('#roomMax').value,
+    noFall: $('#mapType').value === 'safe', ranked: false, state: 'lobby', round: 0,
+  });
 }
 
 async function findMatch() {
@@ -2234,22 +2307,28 @@ async function findMatch() {
   const noFall = $('#mapType').value === 'safe';
   try {
     const m = await net.findMatch(noFall);
-    await startOnline(m.room, { ranked: true, noFall }, m.host);
+    if (m.host) await startOnline(m.room, { host: net.uid, name: '매칭', isPublic: false, max: 2, noFall, ranked: true, state: 'lobby', round: 0 });
+    else {
+      // 상대가 방을 막 만드는 중일 수 있어 잠깐 기다렸다가 다시 시도
+      for (let i = 0; i < 4; i++) {
+        if (await startOnline(m.room, null, i < 3)) break;
+        await new Promise((r) => setTimeout(r, 700));
+      }
+    }
   } catch (e) { $('#err').textContent = '매칭 실패: ' + (e.message || e); }
   $('#btnMatch').disabled = false;
 }
 
-async function startOnline(code, meta, host = false) {
-  if (!net || !user) return;
+async function startOnline(code, create = null, quiet = false) {
+  if (!net || !user) return false;
   sfx.ensure();
   room = code;
-  $('#btnJoin').disabled = true; $('#err').textContent = '';
+  $('#btnJoin').disabled = $('#btnCreate').disabled = true; $('#err').textContent = '';
   clearWorld();
   mode = 'online';
   makeMe(net.uid, myName());
-  let roomMeta;
   try {
-    roomMeta = await net.join(room, me.snapshot(), {
+    roomMeta = await net.join(room, { ...me.snapshot(), rd: 0 }, {
       upsert(uid, s) {
         if (mode !== 'online') return;
         let f = fighters.get(uid);
@@ -2258,8 +2337,10 @@ async function startOnline(code, meta, host = false) {
           fighters.set(uid, f);
           feed(`${tag(f)} 입장`);
           net.loadProfile(uid).then((p) => { const sk = cleanSkill(p.skill); if (sk && fighters.has(uid)) skills.set(uid, sk); }).catch(() => {});
-          if (ranked && waiting) { waiting = false; net.cancelMatch(); announceFight(); }
+          if (ranked && isHost()) net.cancelMatch(); // 매칭 상대가 들어옴 → 대기 슬롯 비우기
+          syncLobby();
         }
+        f.ready = !!s.rd;
         f.applySnap(s, world);
       },
       remove(uid) {
@@ -2268,48 +2349,166 @@ async function startOnline(code, meta, host = false) {
         feed(`${tag(f)} 퇴장`);
         f.dispose(); fighters.delete(uid); skills.delete(uid);
         if (lockId === uid) lockId = null;
-        if (ranked && !matchOver) { matchOver = true; center('상대가 나갔어요', 'small', 2500); endTimer = setTimeout(leaveGame, 2500); }
+        syncLobby();
+        // 매칭전 상대가 나가면 골드 없이 종료 (나갔다 들어오기로 골드 버는 것 방지)
+        if (ranked && phase !== 'done') { phase = 'done'; center('상대가 나갔어요', 'small', 2500); endTimer = setTimeout(leaveGame, 2500); }
       },
       event(e) { if (me && mode === 'online') me.onEvent(e, world); },
-    }, meta);
+      meta(m) { if (mode === 'online') onMeta(m); },
+    }, create);
   } catch (err) {
-    if (host) net.cancelMatch();
+    if (create?.ranked) net.cancelMatch();
+    await net.leave().catch(() => {});
     startDemo();
-    $('#err').textContent = '입장 실패: ' + (err.message || err);
-    $('#btnJoin').disabled = false;
-    return;
+    if (!quiet) $('#err').textContent = '입장 실패: ' + (err.message || err);
+    $('#btnJoin').disabled = $('#btnCreate').disabled = false;
+    return false;
   }
-  $('#btnJoin').disabled = false;
+  $('#btnJoin').disabled = $('#btnCreate').disabled = false;
   ranked = !!roomMeta.ranked;
   setMap(!!roomMeta.noFall);
-  const mapTag = roomMeta.noFall ? '벽' : '낙사';
-  if (ranked) {
-    $('#roomTag').textContent = `매칭 · ${mapTag} · ${WIN_KO}KO`;
-    $('#btnCopy').hidden = true;
-  } else {
-    history.replaceState(null, '', `?room=${room}`);
-    $('#roomTag').textContent = `ROOM ${room} · ${mapTag}`;
-    $('#btnCopy').hidden = false;
+  world.noRespawn = true;
+  if (!ranked) history.replaceState(null, '', `?room=${room}`);
+  $('#btnCopy').hidden = ranked;
+  if (create?.isPublic) {
+    lobbyEntry = { host: net.uid, name: create.name, max: create.max, noFall: create.noFall, n: fighters.size };
+    net.setLobby(lobbyEntry);
   }
   showScreen('game');
-  waiting = ranked && host && fighters.size < 2;
-  if (host && !waiting) net.cancelMatch(); // 입장 도중 상대가 이미 들어온 경우
-  if (waiting) center('상대를 찾는 중...', 'small', 3600000);
-  else announceFight();
+  $('#room').hidden = false;
+  updateRoomPanel(); setRoomTag();
+  return true;
 }
 
-// 매칭전: 먼저 3 K.O. 하면 승리. 실제 사람과의 매칭전에서만 골드 지급
-function checkMatch() {
-  if (me.kills >= WIN_KO) return endMatch(true);
-  for (const f of fighters.values()) if (f.remote && f.kills >= WIN_KO) return endMatch(false);
+// 공개 방 목록의 인원 수를 방장이 갱신
+function syncLobby() {
+  if (!lobbyEntry || !isHost() || lobbyEntry.n === fighters.size) return;
+  lobbyEntry.n = fighters.size;
+  net.setLobby(lobbyEntry);
 }
-async function endMatch(win) {
-  matchOver = true;
-  center(win ? `WIN! +${WIN_GOLD}G` : 'LOSE', win ? 'win' : 'ko', 3000);
-  endTimer = setTimeout(leaveGame, 3500);
-  if (!win) return;
+
+function onMeta(m) {
+  if (!m) { // 방장이 나가서 방이 사라짐
+    if (phase !== 'done') { phase = 'done'; $('#room').hidden = true; center('방이 닫혔어요', 'small', 2000); endTimer = setTimeout(leaveGame, 2000); }
+    return;
+  }
+  roomMeta = m;
+  if (m.state === 'playing' && m.round !== curRound) startRound(m.round);
+  if (m.state === 'playing' && m.rw && m.rw !== lastRw) { lastRw = m.rw; roundOver(m.rw.split(':')[1]); }
+  if (m.state === 'done' && phase !== 'done') endGame(m.winner || '');
+  setRoomTag(); updateRoomPanel();
+}
+
+function startRound(n) {
+  curRound = n; phase = 'fight'; roundT = 0;
+  $('#room').hidden = true;
+  if (n === 1) { me.kills = 0; me.deaths = 0; myReady = false; }
+  me.respawn();
+  center(roomMeta.max === 2 ? `ROUND ${n}` : 'READY', 'ready', 800);
+  setTimeout(() => { if (phase === 'fight') { center('FIGHT!', 'fight', 900); screenFlash('white'); sfx.play('heavy', 0.6); } }, 850);
+}
+
+function roundOver(uid) {
+  phase = 'pause';
+  const f = fighters.get(uid);
+  center(!f ? 'DRAW' : f === me ? 'ROUND WIN!' : `${f.name} 라운드 승리`, f === me ? 'win' : 'small', 2200);
+}
+
+async function endGame(winner) {
+  phase = 'done'; $('#room').hidden = true;
+  const w = fighters.get(winner), win = w === me;
+  center(win ? (ranked ? `WIN! +${WIN_GOLD}G` : 'WIN!') : w ? `${w.name} 승리` : 'DRAW', win ? 'win' : 'ko', 3500);
+  endTimer = setTimeout(leaveGame, 4500);
+  if (!(win && ranked)) return; // 골드는 실제 사람과의 매칭전 승리만
   try { gold = await net.addGold(WIN_GOLD); showGold(); }
   catch (e) { $('#err').textContent = '골드 저장 실패: ' + (e.code || e.message); }
+}
+
+// 방장만 판정: 다 모여서 다 준비하면 시작, 살아남은 사람이 1명 이하가 되면 라운드/게임 종료
+function hostCheck(dt) {
+  roundT += dt;
+  if (!isHost() || hostBusy) return;
+  const list = [...fighters.values()];
+  if (roomMeta.state === 'lobby') {
+    if (list.length < roomMeta.max || !list.every((f) => ranked || (f === me ? myReady : f.ready))) return;
+    hostBusy = true;
+    if (lobbyEntry) { lobbyEntry = null; net.setLobby(null); }
+    net.setMeta({ state: 'playing', round: 1, wins: null, rw: '' }).finally(() => { hostBusy = false; });
+    return;
+  }
+  if (roomMeta.state !== 'playing' || phase !== 'fight' || roundT < 1.5) return;
+  const alive = list.filter((f) => f.state !== 'ko');
+  if (alive.length > 1) return;
+  const w = alive[0]?.id || '', r = roomMeta.round;
+  hostBusy = true; phase = 'pause';
+  const unlock = () => { hostBusy = false; };
+  if (roomMeta.max !== 2) { net.setMeta({ state: 'done', winner: w }).finally(unlock); return; }
+  const wins = { ...(roomMeta.wins || {}) };
+  if (w) wins[w] = (wins[w] || 0) + 1;
+  if (w && wins[w] >= ROUND_WINS) { net.setMeta({ state: 'done', winner: w, wins }).finally(unlock); return; }
+  net.setMeta({ wins, rw: `${r}:${w}` })
+    .then(() => new Promise((res) => setTimeout(res, 2500)))
+    .then(() => net.setMeta({ round: r + 1 }))
+    .finally(unlock);
+}
+
+function setRoomTag() {
+  if (!roomMeta) return;
+  let t = (ranked ? '매칭' : room) + ' · ' + roomMode();
+  if (roomMeta.max === 2 && curRound) {
+    const opp = [...fighters.values()].find((f) => f !== me);
+    const wins = roomMeta.wins || {};
+    t = `R${curRound} · ${wins[me.id] || 0} : ${(opp && wins[opp.id]) || 0}`;
+  }
+  $('#roomTag').textContent = t;
+}
+
+function updateRoomPanel() {
+  if (!roomMeta || phase !== 'lobby') return;
+  const list = [...fighters.values()];
+  $('#roomTitle').textContent = ranked ? 'MATCH' : roomMeta.isPublic ? 'ROOM' : room;
+  $('#roomInfo').textContent = ranked
+    ? (list.length < 2 ? '상대를 찾는 중...' : '상대를 찾았어요! 곧 시작해요')
+    : `${roomMeta.isPublic ? '공개 방' : '비공개 방 · 코드 ' + room} · ${roomMeta.noFall ? '벽 맵' : '낙사 맵'} · ${roomMode()} · ${list.length}/${roomMeta.max}명`
+      + (list.length < roomMeta.max ? ' · 인원을 기다리는 중' : ' · 모두 준비하면 시작!');
+  const box = $('#roomPlayers');
+  box.innerHTML = '';
+  for (const f of list) {
+    const ready = ranked || (f === me ? myReady : f.ready);
+    const d = document.createElement('div');
+    d.className = 'list-row' + (ready ? ' ready' : '');
+    d.innerHTML = '<b></b><em></em>';
+    d.querySelector('b').textContent = (f.id === roomMeta.host ? '👑 ' : '') + f.name + (f === me ? ' (나)' : '');
+    d.querySelector('em').textContent = ready ? '준비 완료' : '대기 중';
+    box.appendChild(d);
+  }
+  $('#btnReady').hidden = $('#btnInvite').hidden = ranked;
+  $('#btnReady').textContent = myReady ? '준비 취소' : '준비';
+}
+
+// 시작 화면의 공개 방 목록 (실시간)
+let lobbyUnsub = null;
+function watchRooms() {
+  lobbyUnsub?.();
+  lobbyUnsub = net.watchLobby((all) => {
+    const box = $('#roomList');
+    box.innerHTML = '';
+    const rows = Object.entries(all).filter(([c, r]) => /^[A-Z]{4}$/.test(c) && r && typeof r.name === 'string');
+    if (!rows.length) { box.innerHTML = '<p class="note">열린 공개 방이 없어요. 방을 만들어 보세요!</p>'; return; }
+    for (const [code, r] of rows) {
+      const n = +r.n || 0, max = +r.max || 0, full = n >= max;
+      const d = document.createElement('div');
+      d.className = 'list-row';
+      d.innerHTML = '<b></b><em></em><button class="btn"></button>';
+      d.querySelector('b').textContent = r.name.slice(0, 12);
+      d.querySelector('em').textContent = `${r.noFall ? '벽' : '낙사'} · ${max === 2 ? '3판 2선' : '최후의 1인'} · ${n}/${max}`;
+      const b = d.querySelector('button');
+      b.textContent = full ? '가득 참' : '입장';
+      b.disabled = full;
+      b.onclick = () => startOnline(code);
+      box.appendChild(d);
+    }
+  });
 }
 
 async function leaveGame() {
@@ -2388,6 +2587,7 @@ function showLobby() {
   $('#meName').textContent = user.displayName || user.email || '플레이어';
   if (user.photoURL) { $('#meAvatar').src = user.photoURL; $('#meAvatar').hidden = false; }
   loadProfile();
+  watchRooms();
 }
 
 // ================= 사진 스킨 =================
@@ -2440,6 +2640,10 @@ function buildSwatches() {
 $('#btnPractice').onclick = startPractice;
 $('#btnJoin').onclick = joinFromInput;
 $('#btnMatch').onclick = findMatch;
+$('#btnCreate').onclick = createRoom;
+$('#btnReady').onclick = () => { myReady = !myReady; updateRoomPanel(); sfx.ensure(); sfx.play('ui'); };
+$('#btnInvite').onclick = () => $('#btnCopy').onclick();
+$('#btnRoomLeave').onclick = leaveGame;
 $('#roomInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinFromInput(); });
 $('#mapType').value = store.get('pf_map', 'fall') === 'safe' ? 'safe' : 'fall';
 $('#mapType').onchange = () => store.set('pf_map', $('#mapType').value);
@@ -2463,6 +2667,7 @@ $('#btnLogin').onclick = async () => {
   catch (e) { $('#err').textContent = '로그인 실패: ' + (e.code || e.message); }
 };
 $('#btnLogout').onclick = async () => {
+  lobbyUnsub?.(); lobbyUnsub = null;
   await net.signOut(); user = null; gold = 0; mySkill = null; ownedSkins = new Set([0]); buildSkins();
   $('#lobby').hidden = true; $('#btnLogin').hidden = false;
 };
@@ -2472,8 +2677,7 @@ async function boot() {
   buildSkins();
   startDemo();
   const params = new URLSearchParams(location.search);
-  const rnd = Math.random().toString(36).slice(2, 6).toUpperCase();
-  $('#roomInput').value = (params.get('room') || rnd).toUpperCase();
+  $('#roomInput').value = (params.get('room') || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
   if (isTouch) document.body.classList.add('touch');
   if (!isConfigured(firebaseConfig)) {
     $('#btnLogin').disabled = true;
@@ -2519,13 +2723,13 @@ function tick(dt, now) {
     for (const f of fighters.values()) if (f.remote) f.updateRemote(dt);
     if (mode === 'online') {
       sendAcc += dt;
-      if (sendAcc >= 1 / 15) { sendAcc = 0; net.sendState(me.snapshot()); }
+      if (sendAcc >= 1 / 15) { sendAcc = 0; net.sendState({ ...me.snapshot(), rd: myReady ? 1 : 0 }); }
     }
-    if (ranked && !matchOver && me) checkMatch();
+    if (mode === 'online' && roomMeta) hostCheck(dt);
     if (playing()) {
       updateBars(dt);
       hudAcc += dt;
-      if (hudAcc > 0.2) { hudAcc = 0; updateRoster(); }
+      if (hudAcc > 0.2) { hudAcc = 0; updateRoster(); updateRoomPanel(); }
       if (comboT > 0) { comboT -= dt; if (comboT <= 0) { combo = 0; comboDmg = 0; $('#combo').classList.remove('show'); } }
     }
     for (const f of fighters.values()) f.animate(simDt, f !== me && mode !== 'demo');
@@ -2543,6 +2747,8 @@ boot();
 let simClock = 0;
 window.__pf = {
   world, get me() { return me; },
+  // selftest.html 용: 가짜 서버로 방/라운드 로직 확인
+  test: { startOnline, get phase() { return phase; }, get meta() { return roomMeta; }, set net(v) { net = v; }, set user(v) { user = v; } },
   step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) { simClock += dt * 1000; tick(dt, performance.now() + simClock); } },
 };
 return {  };

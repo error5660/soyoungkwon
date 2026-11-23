@@ -3,8 +3,9 @@
     "rooms": {
       "$room": {
         ".read": "auth != null",
+        ".write": "auth != null && !newData.exists() && data.child('meta/host').val() === auth.uid",
         "meta": {
-          ".write": "auth != null && !data.exists()"
+          ".write": "auth != null && (data.exists() ? data.child('host').val() === auth.uid : newData.child('host').val() === auth.uid)"
         },
         "players": {
           "$uid": {
@@ -19,6 +20,12 @@
             }
           }
         }
+      }
+    },
+    "lobby": {
+      ".read": "auth != null",
+      "$room": {
+        ".write": "auth != null && (data.exists() ? data.child('host').val() === auth.uid : newData.child('host').val() === auth.uid)"
       }
     },
     "mm": {
