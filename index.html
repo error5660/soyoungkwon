@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <title>소영권</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ffcf4a'/%3E%3Cstop offset='1' stop-color='%23ff2d55'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Ctext x='32' y='46' font-size='40' font-weight='900' text-anchor='middle' fill='white' font-family='Malgun Gothic,sans-serif'%3E%EC%86%8C%3C/text%3E%3C/svg%3E">
   <meta name="description" content="친구들과 함께하는 3D 멀티플레이 격투 게임">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -256,7 +257,7 @@ body.touch #feed { top: 160px; }
           <div class="row"><input id="roomInput" maxlength="4" autocomplete="off"><button id="btnJoin" class="btn">입장 ▶</button></div>
           <label>공개 방 목록</label>
           <div id="roomList"><p class="note">불러오는 중...</p></div>
-          <button id="btnMatch" class="btn primary wide">매칭 찾기 ▶ 1:1 · 3판 2선 승리 = +10G</button>
+          <button id="btnMatch" class="btn primary wide">매칭 찾기 ▶ 1:1 · 3판 2선 승리 = +30G</button>
           <button id="btnShop" class="btn wide">상점 · 커스텀 기술 (500G)</button>
         </div>
       </div>
@@ -290,7 +291,7 @@ body.touch #feed { top: 160px; }
           <tr><td><kbd>Space</kbd></td><td>점프 (공중 J/K 점프킥)</td></tr>
           <tr><td><kbd>Shift</kbd></td><td>회피 (무적 대시)</td></tr>
           <tr><td><kbd>Tab</kbd></td><td>타겟 변경</td></tr>
-          <tr><td><kbd>E</kbd></td><td>커스텀 기술 (상점 구매 · 쿨타임 10초)</td></tr>
+          <tr><td><kbd>E</kbd></td><td>커스텀 기술 (상점 구매 · 쿨타임 15초)</td></tr>
         </table>
         <p class="note">패링 성공 → 상대 1초 무방비 + 다음 공격 1.6배. 링 밖으로 떨어지면 K.O.!</p>
       </details>
@@ -346,7 +347,7 @@ body.touch #feed { top: 160px; }
   <div id="shop" class="screen" hidden>
     <div class="panel small">
       <h2>SHOP</h2>
-      <p class="note">보유 골드 <b id="shopGold" class="gold">0</b> · 스킨 200G · 커스텀 기술 500G<br>실제 사람과 매칭 대전에서 이기면 +10G</p>
+      <p class="note">보유 골드 <b id="shopGold" class="gold">0</b> · 스킨 200G · 커스텀 기술 500G<br>실제 사람과 매칭 대전에서 이기면 +30G</p>
       <label>스킨 (눌러서 구매)</label>
       <div id="shopSkins" class="skins"></div>
       <label>커스텀 기술</label>
@@ -677,7 +678,7 @@ __m['fighter'] = (() => {
 
 
 const ARENA_R = 11;
-const MAX_HP = 100;
+const MAX_HP = 150; // 100 → 150: 판이 너무 빨리 끝나서 늘림
 const PARRY_WIN = 0.18;
 const GRAV = 24, JUMP_V = 8.2, SPEED = 4.8, AIR_CTRL = 3.8, GUARD_SPEED = 1.4;
 const DODGE_T = 0.34, DODGE_IF = 0.28, DODGE_V = 12, DODGE_CD = 0.7;
@@ -690,9 +691,9 @@ const MOVES = {
   l3:  { kind: 'light', fx: 'mid',   st: 0.12, ac: 0.12, rc: 0.32, dmg: 8,  range: 2.2,  kb: 8,   up: 3,   hs: 0.50, lunge: 4.5 },
   hv:  { kind: 'heavy', fx: 'heavy', st: 0.36, ac: 0.12, rc: 0.45, dmg: 16, range: 2.35, kb: 13,  up: 4.5, hs: 0.65, lunge: 8.5, guardBreak: true },
   air: { kind: 'air',   fx: 'mid',   st: 0.06, ac: 0.30, rc: 0.20, dmg: 9,  range: 1.9,  kb: 7,   up: 1,   hs: 0.45, lunge: 0 },
-  sp:  { kind: 'heavy', fx: 'heavy', st: 0.30, ac: 0.15, rc: 0.50, dmg: 22, range: 2.6,  kb: 15,  up: 6,   hs: 0.75, lunge: 9.5, guardBreak: true },
+  sp:  { kind: 'heavy', fx: 'heavy', st: 0.30, ac: 0.15, rc: 0.50, dmg: 15, range: 2.6,  kb: 11,  up: 5,   hs: 0.75, lunge: 9.5, guardBreak: true },
 };
-const SKILL_CD = 10;
+const SKILL_CD = 15;
 
 function angLerp(a, b, k) {
   let d = (((b - a + Math.PI) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
@@ -1895,7 +1896,7 @@ let menuOpen = false, hitstop = 0, shake = 0, fovKick = 0, slowT = 0;
 let combo = 0, comboT = 0, comboDmg = 0;
 let colorIdx = Math.min(COLORS.length - 1, Math.max(0, parseInt(store.get('pf_color', '0'), 10) || 0));
 const playing = () => mode === 'practice' || mode === 'online';
-const WIN_GOLD = 10, ROUND_WINS = 2;
+const WIN_GOLD = 30, ROUND_WINS = 2; // WIN_GOLD 를 바꾸면 database.rules.json 의 gold 상한(+30)도 같이 바꿀 것
 let ranked = false, endTimer = 0, gold = 0, mySkill = null;
 // 온라인 방 상태: phase = lobby(대기실) | fight | pause(라운드 사이) | done
 let roomMeta = null, phase = 'lobby', myReady = false, curRound = 0, roundT = 0, hostBusy = false, lastRw = '', lobbyEntry = null;
@@ -2190,10 +2191,10 @@ function setBar(key, f, dt) {
   if (f.hp < b.last) b.delay = 0.45;
   b.last = f.hp;
   if (b.chip > f.hp) { b.delay -= dt; if (b.delay <= 0) b.chip = Math.max(f.hp, b.chip - dt * 45); } else b.chip = f.hp;
-  $(`#${key}hp`).style.width = Math.max(0, f.hp) + '%';
-  $(`#${key}chip`).style.width = Math.max(0, b.chip) + '%';
+  $(`#${key}hp`).style.width = Math.max(0, f.hp) / MAX_HP * 100 + '%';
+  $(`#${key}chip`).style.width = Math.max(0, b.chip) / MAX_HP * 100 + '%';
   $(`#${key}k`).textContent = `${f.kills} K.O.`;
-  root.classList.toggle('low', f.hp <= 25 && f.hp > 0);
+  root.classList.toggle('low', f.hp <= MAX_HP / 4 && f.hp > 0);
 }
 function updateBars(dt) {
   if (!me) return;
