@@ -2202,7 +2202,9 @@ const WIN_GOLD = 30, ROUND_WINS = 2; // WIN_GOLD 를 바꾸면 database.rules.js
 let ranked = false, endTimer = 0, gold = 0, mySkill = null, mySkills = {}, myDmg = 0;
 // 꾸미기 아이템: items/<id> 보유. e_ = 도발/승리 포즈(100G), h_ = 타격 이펙트(150G), ko = K.O. 문구(300G)
 let myItems = {}, myKo = '';
-const koTexts = new Map(); // 다른 사람의 K.O. 문구
+// 게임 버전: 실시간 데이터에 같이 보내서, 예전 버전(캐시)으로 접속한 사람을 알려줌. 올릴 때마다 바꿀 것
+const GAME_VER = '2026-11-24b';
+const mySnap = () => ({ ...me.snapshot(), rd: myReady ? 1 : 0, v: GAME_VER, kt: myKo });
 const ITEM_PRICE = (id) => (id === 'ko' ? 300 : id.startsWith('h_') ? 150 : 100);
 const HIT_NAMES = { h_gold: '금색', h_purple: '보라', h_rainbow: '무지개', h_sky: '라이트블루' };
 const cleanKo = (t) => (typeof t === 'string' ? t.trim().slice(0, 12) : '');
@@ -2366,7 +2368,7 @@ const world = {
     if (f === me || k === me) {
       slowT = 0.9; fovKick = 8; screenFlash('white');
       // 쓰러뜨린 사람이 K.O. 문구를 샀으면 그 문구가 양쪽 화면에 크게 뜸
-      const phrase = k ? (k === me ? myKo : koTexts.get(k.id)) || '' : '';
+      const phrase = k ? (k === me ? myKo : k.koText) || '' : '';
       center(phrase || (f === me ? (k ? 'K.O.' : 'RING OUT') : 'K.O.!'), (f === me ? 'ko' : 'win') + (phrase ? ' phrase' : ''), phrase ? 2200 : 1700);
       if (k === me && mode === 'practice') playWinPose();
     }
@@ -2552,7 +2554,7 @@ function updateRoster() {
 function clearWorld() {
   for (const f of fighters.values()) f.dispose();
   fighters.clear(); bots = []; me = null; lockId = null; mode = null;
-  skills.clear(); koTexts.clear(); ranked = false; clearTimeout(endTimer); setMap(false);
+  skills.clear(); ranked = false; clearTimeout(endTimer); setMap(false);
   roomMeta = null; phase = 'lobby'; myReady = false; curRound = 0; lastRw = ''; lobbyEntry = null; world.noRespawn = false;
   $('#cutin').hidden = true;
   combo = 0; comboT = 0; $('#combo').classList.remove('show');
@@ -2671,7 +2673,7 @@ async function startOnline(code, create = null, quiet = false) {
   mode = 'online';
   makeMe(net.uid, myName());
   try {
-    roomMeta = await net.join(room, { ...me.snapshot(), rd: 0 }, {
+    roomMeta = await net.join(room, mySnap(), {
       upsert(uid, s) {
         if (mode !== 'online') return;
         let f = fighters.get(uid);
@@ -2683,12 +2685,18 @@ async function startOnline(code, create = null, quiet = false) {
           net.loadProfile(uid).then((p) => {
             if (!fighters.has(uid)) return;
             const sk = skillIn(p, ks); if (sk) skills.set(uid, sk);
-            const ko = p.items?.ko ? cleanKo(p.koText) : ''; if (ko) koTexts.set(uid, ko);
           }).catch(() => {});
+          // 버전이 다르면 새 기능(도발·K.O. 문구 등)이 서로 안 보이므로 알려줌
+          if (s.v !== GAME_VER) {
+            const oldMe = typeof s.v === 'string' && s.v > GAME_VER;
+            feed(oldMe ? '⚠️ 내 게임이 예전 버전이에요. Ctrl+F5로 새로고침하세요' : `⚠️ ${tag(f)} 님은 예전 버전이에요. Ctrl+F5로 새로고침해야 도발·K.O. 문구가 보여요`);
+            center(oldMe ? '내 게임이 예전 버전 · Ctrl+F5' : `${f.name} 님 예전 버전 · 새로고침 필요`, 'small', 3500);
+          }
           if (ranked && isHost()) net.cancelMatch(); // 매칭 상대가 들어옴 → 대기 슬롯 비우기
           syncLobby();
         }
         f.ready = !!s.rd;
+        f.koText = cleanKo(s.kt);
         f.applySnap(s, world);
       },
       remove(uid) {
@@ -3200,7 +3208,7 @@ function tick(dt, now) {
     for (const f of fighters.values()) if (f.remote) f.updateRemote(dt);
     if (mode === 'online') {
       sendAcc += dt;
-      if (sendAcc >= 1 / 15) { sendAcc = 0; net.sendState({ ...me.snapshot(), rd: myReady ? 1 : 0 }); }
+      if (sendAcc >= 1 / 15) { sendAcc = 0; net.sendState(mySnap()); }
     }
     if (mode === 'online' && roomMeta) hostCheck(dt);
     if (playing()) {
