@@ -38,7 +38,7 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; margin: 0 2px; b
   background: linear-gradient(90deg, rgba(6,3,16,.88) 0%, rgba(6,3,16,.55) 38%, rgba(6,3,16,0) 65%); }
 /* 세로 가운데는 auto 여백으로: align-items:center 는 내용이 길면 위쪽이 스크롤 밖으로 잘림 */
 .screen > .panel { margin-block: auto; }
-#menu.screen, #shop.screen, #room.screen { justify-content: center; padding: 16px; background: rgba(6,3,16,.6); backdrop-filter: blur(4px); }
+#menu.screen, #shop.screen, #room.screen, #rank.screen { justify-content: center; padding: 16px; background: rgba(6,3,16,.6); backdrop-filter: blur(4px); }
 .panel { width: min(430px, 100%); background: var(--panel); border: 1px solid var(--line); padding: 28px 26px 22px;
   backdrop-filter: blur(12px); box-shadow: 0 30px 80px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.08);
   clip-path: polygon(0 0, calc(100% - 26px) 0, 100% 26px, 100% 100%, 26px 100%, 0 calc(100% - 26px)); position: relative; }
@@ -261,7 +261,10 @@ body.touch #feed { top: 160px; }
           <label>공개 방 목록</label>
           <div id="roomList"><p class="note">불러오는 중...</p></div>
           <button id="btnMatch" class="btn primary wide">매칭 찾기 ▶ 1:1 · 3판 2선 승리 = +30G</button>
-          <button id="btnShop" class="btn wide">상점 · 커스텀 기술 (500G)</button>
+          <div class="row">
+            <button id="btnShop" class="btn wide">상점</button>
+            <button id="btnRank" class="btn wide">랭킹</button>
+          </div>
         </div>
       </div>
 
@@ -344,6 +347,19 @@ body.touch #feed { top: 160px; }
       <button id="btnReady" class="btn primary wide">준비</button>
       <button id="btnInvite" class="btn wide">초대 링크 복사</button>
       <button id="btnRoomLeave" class="btn danger wide">나가기</button>
+    </div>
+  </div>
+
+  <div id="rank" class="screen" hidden>
+    <div class="panel small">
+      <h2>RANK</h2>
+      <div class="row" role="tablist">
+        <button id="rkGold" class="btn tab on" role="tab">골드</button>
+        <button id="rkDmg" class="btn tab" role="tab">누적 피해</button>
+      </div>
+      <p id="rankNote" class="note"></p>
+      <div id="rankList"></div>
+      <button id="btnRankClose" class="btn wide">닫기</button>
     </div>
   </div>
 
@@ -643,6 +659,17 @@ class FireNet {
       return { ...u, gold: u.gold - SKILL_PRICE, skills: { ...has, [slot]: skill } };
     });
     return { res: r.committed || res === 'full' ? res : 'nogold', user: r.snapshot.val() || {} };
+  }
+
+  // 랭킹: ranks/<uid> = { n: 이름, g: 골드, d: 누적 피해 } (users 는 기술 사진 때문에 무거워서 따로 둠)
+  saveRank(rank) { return this.D.update(this.D.ref(this.db, `ranks/${this.uid}`), rank); }
+  addDamage(n) { return this.D.runTransaction(this.D.ref(this.db, `ranks/${this.uid}/d`), (d) => (d || 0) + n); }
+  async topRanks(key) {
+    const { query, ref, orderByChild, limitToLast, get } = this.D;
+    const s = await get(query(ref(this.db, 'ranks'), orderByChild(key), limitToLast(10)));
+    const rows = [];
+    s.forEach((c) => { rows.push({ uid: c.key, ...c.val() }); });
+    return rows.filter((r) => typeof r[key] === 'number').reverse();
   }
 
   deleteSkill(slot) {
@@ -1420,7 +1447,10 @@ class Fighter {
       if (this.state === 'attack' && this.move === 'sp') world.onSkill?.(this);
     }
     if (typeof s.h === 'number') {
-      if (s.h < this.hp && this.state !== 'ko') world.popup(this, '-' + (this.hp - s.h), 'dmg');
+      if (s.h < this.hp) {
+        if (this.state !== 'ko') world.popup(this, '-' + (this.hp - s.h), 'dmg');
+        world.onRemoteDamage?.(this.hp - s.h, s.lb); // 가드·패링이 반영된 실제 피해 (마지막으로 때린 사람에게)
+      }
       this.hp = s.h;
     }
     this.lastHitBy = s.lb || null;
@@ -2106,7 +2136,7 @@ let combo = 0, comboT = 0, comboDmg = 0;
 let colorIdx = Math.min(COLORS.length - 1, Math.max(0, parseInt(store.get('pf_color', '0'), 10) || 0));
 const playing = () => mode === 'practice' || mode === 'online';
 const WIN_GOLD = 30, ROUND_WINS = 2; // WIN_GOLD 를 바꾸면 database.rules.json 의 gold 상한(+30)도 같이 바꿀 것
-let ranked = false, endTimer = 0, gold = 0, mySkill = null, mySkills = {};
+let ranked = false, endTimer = 0, gold = 0, mySkill = null, mySkills = {}, myDmg = 0;
 const SKILL_SLOTS = ['s1', 's2'];
 // 프로필에서 기술 칸 읽기 (예전 방식으로 산 'skill' 은 s1 칸)
 const skillIn = (p, k) => cleanSkill((p.skills || {})[k] || (k === 's1' ? p.skill : null));
@@ -2164,6 +2194,8 @@ const world = {
   fighters,
   noFall: false,
   noRespawn: false,
+  // 피해 랭킹: 온라인에서 실제 사람에게 준 피해만 모음 (나갈 때 한 번에 저장)
+  onRemoteDamage(n, by) { if (mode === 'online' && me && by === me.id && n > 0 && n <= 60) myDmg += n; },
   // 커스텀 기술 컷인: 쓴 사람의 기술명 + 사진을 모두의 화면에 띄움
   onSkill(f) {
     const s = skills.get(f.id);
@@ -2640,7 +2672,7 @@ async function endGame(winner) {
   center(win ? (ranked ? `WIN! +${WIN_GOLD}G` : 'WIN!') : w ? `${w.name} 승리` : 'DRAW', win ? 'win' : 'ko', 3500);
   endTimer = setTimeout(leaveGame, 4500);
   if (!(win && ranked)) return; // 골드는 실제 사람과의 매칭전 승리만
-  try { gold = await net.addGold(WIN_GOLD); showGold(); }
+  try { gold = await net.addGold(WIN_GOLD); showGold(); syncRank(); }
   catch (e) { $('#err').textContent = '골드 저장 실패: ' + (e.code || e.message); }
 }
 
@@ -2733,6 +2765,11 @@ function watchRooms() {
 
 async function leaveGame() {
   clearTimeout(endTimer);
+  // shortcut: 게임 중 창을 그냥 닫으면 그 판 피해는 저장 안 됨, 필요하면 판마다 저장으로 바꾸기
+  if (myDmg > 0 && net && user) {
+    const n = Math.min(5000, myDmg); myDmg = 0;
+    syncRank().then(() => net.addDamage(n)).catch(() => {});
+  }
   if (mode === 'online' && net) { await net.cancelMatch(); await net.leave(); }
   showScreen('start');
   startDemo();
@@ -2749,7 +2786,12 @@ function setProfile(p) {
   for (const k of SKILL_SLOTS) { const sk = skillIn(p, k); if (sk) mySkills[k] = sk; }
   mySkill = mySkills[equippedKey()] || null;
   ownedSkins = new Set([0, ...Object.keys(p.skins || {}).map((k) => parseInt(k.slice(1), 10)).filter((i) => PHOTO_SKINS[i])]);
-  showGold(); buildSkins(); buildMySkills();
+  showGold(); buildSkins(); buildMySkills(); syncRank();
+}
+// 랭킹에 내 이름(닉네임)과 골드 올리기
+function syncRank() {
+  if (!net || !user || !net.saveRank) return Promise.resolve();
+  return net.saveRank({ n: myName(), g: gold }).catch(() => {});
 }
 // 상점 > 커스텀 기술: 산 기술 목록 (장착 / 삭제), 2개 다 차면 구매칸 숨김
 function buildMySkills() {
@@ -2783,6 +2825,32 @@ function shopTab(skillsTab) {
   $('#tabSkins').classList.toggle('on', !skillsTab); $('#tabSkills').classList.toggle('on', skillsTab);
   $('#tabSkins').setAttribute('aria-selected', String(!skillsTab)); $('#tabSkills').setAttribute('aria-selected', String(skillsTab));
 }
+// 랭킹 화면: g = 골드, d = 누적 피해 (상위 10명)
+async function showRanks(key) {
+  $('#rkGold').classList.toggle('on', key === 'g'); $('#rkDmg').classList.toggle('on', key === 'd');
+  $('#rkGold').setAttribute('aria-selected', String(key === 'g')); $('#rkDmg').setAttribute('aria-selected', String(key === 'd'));
+  $('#rankNote').textContent = key === 'g' ? '지금 가진 골드 순위 · 상위 10명' : '온라인 대전에서 실제 사람에게 준 피해 합계 · 상위 10명';
+  const box = $('#rankList');
+  box.innerHTML = '<p class="note">불러오는 중...</p>';
+  try {
+    const rows = await net.topRanks(key);
+    box.innerHTML = rows.length ? '' : '<p class="note">아직 기록이 없어요.</p>';
+    rows.forEach((r, i) => {
+      const d = document.createElement('div');
+      d.className = 'list-row' + (r.uid === net.uid ? ' ready' : '');
+      d.innerHTML = '<em></em><b></b><em></em>';
+      const [no, val] = d.querySelectorAll('em');
+      no.textContent = `${i + 1}위`;
+      d.querySelector('b').textContent = String(r.n || '???').slice(0, 12) + (r.uid === net.uid ? ' (나)' : '');
+      val.textContent = r[key].toLocaleString() + (key === 'g' ? 'G' : '');
+      box.appendChild(d);
+    });
+  } catch (e) { box.innerHTML = ''; $('#rankNote').textContent = '랭킹 불러오기 실패: ' + errText(e); }
+}
+$('#btnRank').onclick = () => { $('#rank').hidden = false; syncRank().then(() => showRanks('g')); };
+$('#btnRankClose').onclick = () => { $('#rank').hidden = true; };
+$('#rkGold').onclick = () => showRanks('g');
+$('#rkDmg').onclick = () => showRanks('d');
 $('#tabSkins').onclick = () => shopTab(false);
 $('#tabSkills').onclick = () => shopTab(true);
 async function loadProfile() {
@@ -2910,6 +2978,7 @@ $('#mapType').value = store.get('pf_map', 'fall') === 'safe' ? 'safe' : 'fall';
 $('#mapType').onchange = () => store.set('pf_map', $('#mapType').value);
 $('#nick').value = store.get('pf_nick', '').slice(0, 6);
 $('#nick').oninput = () => store.set('pf_nick', $('#nick').value.trim());
+$('#nick').onchange = () => syncRank(); // 닉네임을 바꾸면 랭킹 이름도 바뀜
 $('#btnResume').onclick = () => toggleMenu(false);
 $('#btnLeave').onclick = leaveGame;
 $('#btnMenu').onclick = () => toggleMenu(true);
@@ -3009,7 +3078,7 @@ let simClock = 0;
 window.__pf = {
   world, get me() { return me; },
   // selftest.html 용: 가짜 서버로 방/라운드 로직 확인
-  test: { startOnline, setProfile, get phase() { return phase; }, get meta() { return roomMeta; }, set net(v) { net = v; }, set user(v) { user = v; } },
+  test: { startOnline, setProfile, get dmg() { return myDmg; }, get phase() { return phase; }, get meta() { return roomMeta; }, set net(v) { net = v; }, set user(v) { user = v; } },
   step(n = 1, dt = 1 / 60) { for (let i = 0; i < n; i++) { simClock += dt * 1000; tick(dt, performance.now() + simClock); } },
 };
 return {  };
