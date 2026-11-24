@@ -155,6 +155,7 @@ input { text-transform: uppercase; letter-spacing: 4px; font: 18px var(--tech); 
 #center.win { font-size: 130px; }
 #center.ready { font-size: 80px; background-image: linear-gradient(180deg, #fff, #c9c2ff); }
 #center.fight { font-size: 140px; background-image: linear-gradient(180deg, #fff 10%, #ffe27a 40%, #ff2d55 85%); }
+#center.phrase { font-size: clamp(36px, 8vw, 100px); line-height: 1.1; }
 #center.small { font: 26px var(--tech); background-image: linear-gradient(#fff, #fff); filter: drop-shadow(0 2px 0 #000); letter-spacing: 2px; }
 #respawn { position: absolute; top: 52%; left: 0; right: 0; text-align: center; font: 22px var(--tech); letter-spacing: 4px; color: #fff; text-shadow: 0 0 12px var(--red); }
 #keys { position: absolute; bottom: 14px; left: 12px; font-size: 12px; color: rgba(255,255,255,.65); }
@@ -170,6 +171,7 @@ body.touch #keys { display: none; }
 .pop.parry { color: #8ff; font-size: 36px; text-shadow: 0 3px 0 #000, 0 0 16px #2bd3ff; }
 .pop.gb { color: #ffe066; }
 .pop.miss { color: #c9c2ff; font-size: 20px; }
+.pop.emote { color: #fff; font: 28px var(--display); font-style: normal; text-shadow: 0 3px 0 #000, 0 0 14px rgba(255,191,46,.9); animation-duration: 2s; }
 @keyframes pop { 0% { transform: translate(-50%, -50%) scale(2); opacity: 0; } 12% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
   100% { transform: translate(-50%, -170%) scale(.9); opacity: 0; } }
 
@@ -218,6 +220,8 @@ body.touch #feed { top: 160px; }
 .list-row.ready em { color: #4be37a; }
 .btn.tab { flex: 1; background: rgba(5,3,14,.7); }
 .btn.tab.on { background: linear-gradient(180deg, #ffbf2e, #c98a0e); color: #1a1205; }
+.list-row .swatch { width: 18px; height: 18px; flex: none; transform: skewX(-12deg); }
+#paneDeco .list-row b { font-weight: 600; font-size: 12px; white-space: normal; }
 .list-row img { width: 36px; height: 36px; object-fit: cover; flex: none; }
 .skins { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 #skinPick { justify-content: flex-start; }
@@ -298,6 +302,7 @@ body.touch #feed { top: 160px; }
           <tr><td><kbd>Shift</kbd></td><td>회피 (무적 대시)</td></tr>
           <tr><td><kbd>Tab</kbd></td><td>타겟 변경</td></tr>
           <tr><td><kbd>E</kbd></td><td>커스텀 기술 (상점 구매 · 쿨타임 15초)</td></tr>
+          <tr><td><kbd>T</kbd></td><td>도발 (상점 구매 · 이기면 자동 승리 포즈)</td></tr>
         </table>
         <p class="note">패링 성공 → 상대 1초 무방비 + 다음 공격 1.6배. 링 밖으로 떨어지면 K.O.!</p>
       </details>
@@ -327,7 +332,7 @@ body.touch #feed { top: 160px; }
     <div id="combo"></div>
     <div id="center"></div>
     <div id="respawn" hidden></div>
-    <div id="keys"><kbd>J</kbd> 약 <kbd>K</kbd> 강 <kbd>L</kbd> 가드/패링 <kbd>Space</kbd> 점프 <kbd>Shift</kbd> 회피 <kbd>Tab</kbd> 타겟 <kbd>E</kbd> 기술 <kbd>Esc</kbd> 메뉴</div>
+    <div id="keys"><kbd>J</kbd> 약 <kbd>K</kbd> 강 <kbd>L</kbd> 가드/패링 <kbd>Space</kbd> 점프 <kbd>Shift</kbd> 회피 <kbd>Tab</kbd> 타겟 <kbd>E</kbd> 기술 <kbd>T</kbd> 도발 <kbd>Esc</kbd> 메뉴</div>
   </div>
 
   <div id="menu" class="screen" hidden>
@@ -370,6 +375,7 @@ body.touch #feed { top: 160px; }
       <div class="row" role="tablist">
         <button id="tabSkins" class="btn tab on" role="tab">스킨</button>
         <button id="tabSkills" class="btn tab" role="tab">커스텀 기술</button>
+        <button id="tabDeco" class="btn tab" role="tab">꾸미기</button>
       </div>
       <div id="paneSkins">
         <p class="note">스킨 200G · 눌러서 구매</p>
@@ -387,6 +393,14 @@ body.touch #feed { top: 160px; }
           <button id="btnBuy" class="btn primary wide">500G로 구매</button>
         </div>
       </div>
+      <div id="paneDeco" hidden>
+        <label>승리 포즈 · 도발 (T 키, 이기면 자동) · 100G</label>
+        <div id="decoEmotes"></div>
+        <label>타격 이펙트 색 (상대 화면에도 보여요) · 150G</label>
+        <div id="decoHits"></div>
+        <label>K.O. 문구 (쓰러뜨리면 양쪽 화면에 크게) · 300G</label>
+        <div id="decoKo"></div>
+      </div>
       <button id="btnShopClose" class="btn wide">닫기</button>
       <p id="shopErr" class="err"></p>
     </div>
@@ -401,6 +415,7 @@ body.touch #feed { top: 160px; }
       <button data-k="heavy">강</button>
       <button data-k="light">약</button>
       <button data-k="skill" hidden>기술</button>
+      <button data-k="emote" hidden>도발</button>
     </div>
   </div>
 
@@ -672,6 +687,22 @@ class FireNet {
     return rows.filter((r) => typeof r[key] === 'number').reverse();
   }
 
+  // 꾸미기 아이템 구매: 골드 차감 + items/<id> 를 한 번에. 결과 { res: 'ok'|'owned'|'nogold', user }
+  async buyItem(id, price) {
+    let res = 'nogold';
+    const r = await this.D.runTransaction(this.D.ref(this.db, `users/${this.uid}`), (u) => {
+      res = 'nogold';
+      if (u === null) return null;
+      if (u.items && u.items[id]) { res = 'owned'; return; }
+      if ((u.gold || 0) < price) return;
+      res = 'ok';
+      return { ...u, gold: u.gold - price, items: { ...(u.items || {}), [id]: true } };
+    });
+    return { res: r.committed || res === 'owned' ? res : 'nogold', user: r.snapshot.val() || {} };
+  }
+
+  setKoText(text) { return this.D.set(this.D.ref(this.db, `users/${this.uid}/koText`), text); }
+
   deleteSkill(slot) {
     return this.D.update(this.D.ref(this.db, `users/${this.uid}`), { [`skills/${slot}`]: null, ...(slot === 's1' ? { skill: null } : {}) });
   }
@@ -743,6 +774,20 @@ const MOVES = {
   sp:  { kind: 'heavy', fx: 'heavy', st: 0.30, ac: 0.15, rc: 0.50, dmg: 15, range: 2.6,  kb: 11,  up: 5,   hs: 0.75, lunge: 9.5, guardBreak: true },
 };
 const SKILL_CD = 15;
+// 승리 포즈 / 도발 (T키, 라운드·게임 이기면 자동). pose(t) = 시간별 자세, say = 머리 위 말
+const S = Math.sin;
+const EMOTES = {
+  siu: { name: '호우! 점프', dur: 2.3, say: '호우!!!', pose(t) { // 뛰어올라 반 바퀴 돌고 등 돌린 채 착지
+    if (t < 0.45) return { hipY: 0.74, lKnX: 1.3, rKnX: 1.3, lHpX: -0.9, rHpX: -0.9, spX: 0.45, lShX: 0.6, rShX: 0.6, lElX: -0.4, rElX: -0.4 };
+    if (t < 1.05) { const k = (t - 0.45) / 0.6; return { hipY: 0.93 + S(k * Math.PI) * 0.75, spinY: k * Math.PI, lKnX: 1, rKnX: 1, lHpX: -0.6, rHpX: -0.6, lShX: -0.3, rShX: -0.3, lShZ: 1.2, rShZ: -1.2 }; }
+    return { spinY: Math.PI, hipY: 0.84, lHpX: -0.25, rHpX: -0.25, lHpZ: 0.4, rHpZ: -0.4, lKnX: 0.35, rKnX: 0.35, lShX: 0.45, rShX: 0.45, lShZ: 0.6, rShZ: -0.6, lElX: -0.15, rElX: -0.15, spX: -0.35, hdX: -0.35 };
+  } },
+  shh: { name: '쉿!', dur: 2.2, say: '쉿~ 🤫', pose: (t) => ({ rShX: -2.05, rShZ: 0.45, rElX: -2.55, lShX: -0.2, lShZ: 0.35, lElX: -0.5, hdX: 0.12 + S(t * 3) * 0.04, spY: 0.25, spZ: S(t * 2) * 0.06, hipY: 0.92 }) },
+  calm: { name: '진정해~', dur: 2.4, say: '진정해~ 진정해~', pose(t) { const w = S(t * 9) * 0.28; return { lShX: -1.05 + w, rShX: -1.05 + w, lShZ: -0.15, rShZ: 0.15, lElX: -0.8, rElX: -0.8, spX: 0.15, hdX: -0.15 + w * 0.3, hipY: 0.9 }; } },
+  ear: { name: '안 들려~', dur: 2.3, say: '안 들려~? 👂', pose: (t) => ({ rShX: -0.2, rShZ: -2.25, rElX: -2.3, lShX: 0.1, lShZ: 0.7, lElX: -1.7, spZ: -0.25 + S(t * 3) * 0.08, spY: 0.35, hdX: 0.05, hipY: 0.92 }) },
+  sleep: { name: '졸려~', dur: 2.6, say: 'Zzz... 💤', pose: (t) => ({ lShX: -1.55, rShX: -1.55, lShZ: -0.55, rShZ: 0.55, lElX: -2.45, rElX: -2.45, spZ: 0.38 + S(t * 2) * 0.08, hdX: 0.25, spX: 0.1, hipY: 0.9, lKnX: 0.5, rKnX: 0.5 }) },
+  griddy: { name: '그리디 춤', dur: 2.6, say: '😎 그리디~', pose(t) { const w = S(t * 11); return { lHpX: -0.35 - Math.max(0, w) * 0.5, rHpX: -0.35 - Math.max(0, -w) * 0.5, lKnX: 0.4 + Math.max(0, w) * 1.3, rKnX: 0.4 + Math.max(0, -w) * 1.3, lShX: -0.3 + w * 0.9, rShX: -0.3 - w * 0.9, lElX: -1.7, rElX: -1.7, spY: w * 0.35, hipY: 0.86 + Math.abs(w) * 0.04, hdX: -0.1 }; } },
+};
 
 function angLerp(a, b, k) {
   let d = (((b - a + Math.PI) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
@@ -1179,6 +1224,14 @@ class Fighter {
     if (name === 'sp') world.onSkill?.(this);
   }
 
+  startEmote(id, world) {
+    if (!EMOTES[id]) return;
+    this.move = id; this.buf = null;
+    this.vel.x = 0; this.vel.z = 0;
+    this.setState('emote');
+    world.onEmote?.(this);
+  }
+
   enterGuard() {
     this.parryOK = this.guardBufT > 0 && this.t - this.lastGuardStart > 0.4;
     if (this.guardBufT > 0) this.lastGuardStart = this.t;
@@ -1240,6 +1293,7 @@ class Fighter {
         if (!grounded && this.pos.y < -0.2) { this.setState('jump'); this.airUsed = true; break; }
         if (inp.dodge && this.dodgeCD <= 0 && grounded) { this.startDodge(mx, mz, mlen, world); break; }
         if (inp.guard && grounded) { this.enterGuard(); break; }
+        if (inp.emote && grounded && this.emote) { this.startEmote(this.emote, world); break; }
         if (inp.skill && grounded && this.hasSkill && this.skillCD <= 0) { this.skillCD = SKILL_CD; this.startMove('sp', world); break; }
         if (inp.jump && grounded) { this.vel.y = JUMP_V; this.airUsed = false; this.setState('jump'); world.sfx('jump', this); break; }
         if (this.buf === 'light') { this.startMove('l1', world); break; }
@@ -1282,6 +1336,10 @@ class Fighter {
       case 'hitstun':
         this.friction(dt, grounded ? 5 : 0.4);
         if (this.stateT >= this.hsDur && grounded) this.setState('idle');
+        break;
+      case 'emote': // 끝나거나, 0.3초 뒤 공격·가드·회피·점프를 누르면 바로 풀림
+        this.friction(dt, 10);
+        if (this.stateT >= (EMOTES[this.move]?.dur || 0) || (this.stateT > 0.3 && (inp.light || inp.heavy || inp.guard || inp.dodge || inp.jump))) this.setState('idle');
         break;
       case 'stunned':
         this.friction(dt, 8);
@@ -1426,7 +1484,7 @@ class Fighter {
       fs: this.fxSeq, ft: this.fxType,
       po: this.state === 'guard' && this.parryOK ? 1 : 0,
       ct: this.counterT > 0 ? 1 : 0, sp: this.spawnProt > 0 ? 1 : 0,
-      lb: this.lastHitBy || '', sk: this.skin, ks: this.skillKey || '',
+      lb: this.lastHitBy || '', sk: this.skin, ks: this.skillKey || '', hx: this.hitFx || '',
     };
   }
 
@@ -1445,6 +1503,7 @@ class Fighter {
       if (this.state === 'ko' && prev !== 'ko') world.onKO(this, s.kb || null);
       if (this.state === 'attack') world.sfx(MOVES[this.move]?.kind === 'heavy' ? 'charge' : 'swing', this);
       if (this.state === 'attack' && this.move === 'sp') world.onSkill?.(this);
+      if (this.state === 'emote') world.onEmote?.(this);
     }
     if (typeof s.h === 'number') {
       if (s.h < this.hp) {
@@ -1460,6 +1519,7 @@ class Fighter {
     if (s.n && s.n !== this.name) this.name = String(s.n).slice(0, 14);
     if (typeof s.c === 'number' && s.c !== this.color) this.setColor(s.c);
     if (typeof s.sk === 'number') this.setSkin(s.sk);
+    this.hitFx = typeof s.hx === 'string' ? s.hx : '';
   }
 
   updateRemote(dt) {
@@ -1477,7 +1537,7 @@ class Fighter {
     const s = this.state, t = this.stateT;
     const P = {
       hipY: 0.93, rootX: 0, spX: 0.12, spY: -0.25, spZ: 0, hdX: -0.05,
-      lShX: -0.75, lShZ: -0.05, lElX: -2.0, rShX: -0.55, rShZ: 0.05, rElX: -2.1,
+      spinY: 0, lShX: -0.75, lShZ: -0.05, lElX: -2.0, rShX: -0.55, rShZ: 0.05, rElX: -2.1,
       lHpX: -0.35, lHpZ: 0.1, lKnX: 0.4, rHpX: 0.25, rHpZ: -0.1, rKnX: 0.35,
     };
     const bob = Math.sin(this.t * 5);
@@ -1515,6 +1575,8 @@ class Fighter {
           Object.assign(P, { rHpX: -1.45, rKnX: 0.0, lHpX: -0.1, lKnX: 1.9, spX: -0.45, lShX: -0.2, lShZ: 1.0, rShX: -0.2, rShZ: -1.0, lElX: -0.6, rElX: -0.6, hdX: 0.3 });
           break;
       }
+    } else if (s === 'emote' && EMOTES[this.move]) {
+      Object.assign(P, EMOTES[this.move].pose(t));
     } else if (s === 'guard') {
       Object.assign(P, { lShX: -1.35, lShZ: -0.35, lElX: -2.35, rShX: -1.35, rShZ: 0.35, rElX: -2.35, spX: 0.3, spY: -0.1, hdX: 0.15, hipY: 0.88, lKnX: 0.6, rKnX: 0.6 });
       if (this.parryOK && t < PARRY_WIN) Object.assign(P, { lShX: -1.6, rShX: -1.6, spX: 0.38 });
@@ -1544,6 +1606,7 @@ class Fighter {
     const L = (o, ax, v) => { o.rotation[ax] += (v - o.rotation[ax]) * k; };
     this.body.position.y += (P.hipY - this.body.position.y) * k;
     L(this.body, 'x', P.rootX);
+    this.body.rotation.y = P.spinY; // 회전은 바로 적용 (보간하면 반 바퀴가 짧은 쪽으로 돎)
     L(this.spine, 'x', P.spX); L(this.spine, 'y', P.spY); L(this.spine, 'z', P.spZ);
     L(this.headG, 'x', P.hdX);
     L(this.lSh, 'x', P.lShX); L(this.lSh, 'z', P.lShZ); L(this.lEl, 'x', P.lElX);
@@ -1606,7 +1669,7 @@ class Fighter {
     if (this._lblHp !== this.hp || this._lblName !== this.name) this.drawLabel();
   }
 }
-return { ARENA_R, MAX_HP, PARRY_WIN, MOVES, angLerp, Fighter, PHOTO_SKINS, PHOTO_SKIN_IMG };
+return { ARENA_R, MAX_HP, PARRY_WIN, MOVES, EMOTES, angLerp, Fighter, PHOTO_SKINS, PHOTO_SKIN_IMG };
 })();
 
 // ===== js/bot.js =====
@@ -1709,7 +1772,7 @@ return { BotBrain };
 
 // ===== js/main.js =====
 __m['main'] = (() => {
-const { Fighter, ARENA_R, MAX_HP, angLerp, PHOTO_SKINS, PHOTO_SKIN_IMG } = __m['fighter'];
+const { Fighter, ARENA_R, MAX_HP, angLerp, PHOTO_SKINS, PHOTO_SKIN_IMG, EMOTES } = __m['fighter'];
 const { BotBrain } = __m['bot'];
 const { Sfx } = __m['sfx'];
 const { FireNet, isConfigured, SKILL_PRICE } = __m['net'];
@@ -2114,11 +2177,11 @@ function emitTrails() {
       spawnSprite(trails, tv, tmpCol.copy(hdr(0xff7a2e, 3)), 0.18, 0.18, -0.6);
       spawnSprite(trails, f.trailPos, tmpCol.copy(hdr(0xffaa44, 1.6)), 0.5, 0.06, 0);
     } else if (t === 'heavy') {
-      spawnSprite(trails, f.trailPos, tmpCol.copy(hdr(0xff6a1a, 3.2)), 0.95, 0.28, 0);
+      spawnSprite(trails, f.trailPos, tmpCol.copy(hdr(hitCol(f, 0xff6a1a), 3.2)), 0.95, 0.28, 0);
       spawnSprite(trails, f.trailPos, tmpCol.copy(hdr(0xffffff, 2)), 0.4, 0.15, 0);
-    } else if (t === 'mid') spawnSprite(trails, f.trailPos, tmpCol.copy(hdr(0xffd060, 2.6)), 0.65, 0.24, 0);
+    } else if (t === 'mid') spawnSprite(trails, f.trailPos, tmpCol.copy(hdr(hitCol(f, 0xffd060), 2.6)), 0.65, 0.24, 0);
     else {
-      spawnSprite(trails, f.trailPos, tmpCol.copy(hdr(f.color, 2.4)), 0.5, 0.16, 0);
+      spawnSprite(trails, f.trailPos, tmpCol.copy(hdr(hitCol(f, f.color), 2.4)), 0.5, 0.16, 0);
       spawnSprite(trails, f.trailPos, tmpCol.copy(hdr(0xffffff, 1.5)), 0.22, 0.1, 0);
     }
   }
@@ -2137,6 +2200,14 @@ let colorIdx = Math.min(COLORS.length - 1, Math.max(0, parseInt(store.get('pf_co
 const playing = () => mode === 'practice' || mode === 'online';
 const WIN_GOLD = 30, ROUND_WINS = 2; // WIN_GOLD 를 바꾸면 database.rules.json 의 gold 상한(+30)도 같이 바꿀 것
 let ranked = false, endTimer = 0, gold = 0, mySkill = null, mySkills = {}, myDmg = 0;
+// 꾸미기 아이템: items/<id> 보유. e_ = 도발/승리 포즈(100G), h_ = 타격 이펙트(150G), ko = K.O. 문구(300G)
+let myItems = {}, myKo = '';
+const koTexts = new Map(); // 다른 사람의 K.O. 문구
+const ITEM_PRICE = (id) => (id === 'ko' ? 300 : id.startsWith('h_') ? 150 : 100);
+const HIT_NAMES = { h_gold: '금색', h_purple: '보라', h_rainbow: '무지개', h_sky: '라이트블루' };
+const cleanKo = (t) => (typeof t === 'string' ? t.trim().slice(0, 12) : '');
+const owns = (id) => !!myItems[id];
+const equipped = (key, prefix) => { const v = store.get(key, ''); return v.startsWith(prefix) && owns(v) ? v : ''; };
 const SKILL_SLOTS = ['s1', 's2'];
 // 프로필에서 기술 칸 읽기 (예전 방식으로 산 'skill' 은 s1 칸)
 const skillIn = (p, k) => cleanSkill((p.skills || {})[k] || (k === 's1' ? p.skill : null));
@@ -2162,7 +2233,7 @@ function popup(f, text, cls) {
   el.style.left = ((p.x * 0.5 + 0.5) * innerWidth + (Math.random() - 0.5) * 40) + 'px';
   el.style.top = ((-p.y * 0.5 + 0.5) * innerHeight) + 'px';
   $('#popups').appendChild(el);
-  setTimeout(() => el.remove(), 900);
+  setTimeout(() => el.remove(), cls === 'emote' ? 2000 : 900);
 }
 
 let centerTimer = 0;
@@ -2233,19 +2304,20 @@ const world = {
     const p = f.pos.clone(); p.y += 1.25;
     const near = me ? f.pos.distanceTo(me.pos) : 99, vol = playing() ? world.volFor(f) : 0;
     const mine = me && f !== me && f.lastHitBy === me.id;
+    const att = fighters.get(f.lastHitBy), C = (base) => hitCol(att, base); // 때린 사람의 타격 이펙트 색
     switch (type) {
       case 'hit': // 약공격: 하얀 날카로운 섬광, 빠르고 가벼운 "팍"
-        burst(p, 0xfff2b0, 12, 7); impact(p, 0xffffff, 1.1); impact(p, 0xffd27a, 0.7);
+        burst(p, C(0xfff2b0), 12, 7); impact(p, 0xffffff, 1.1); impact(p, C(0xffd27a), 0.7);
         sfx.play('hit', vol); f.flash(0xffffff);
         shake = Math.max(shake, 0.14); if (near < 5) hitstop = Math.max(hitstop, 0.065); break;
       case 'midhit': // 킥/점프킥: 노란 충격 + 작은 고리
-        burst(p, 0xffc23d, 20, 8); impact(p, 0xffe27a, 1.5); shock(p, 0xffd060, 0.9);
-        sfx.play('mid', vol); f.flash(0xffcc55);
+        burst(p, C(0xffc23d), 20, 8); impact(p, C(0xffe27a), 1.5); shock(p, C(0xffd060), 0.9);
+        sfx.play('mid', vol); f.flash(C(0xffcc55));
         shake = Math.max(shake, 0.25); fovKick = Math.max(fovKick, near < 7 ? 2.5 : 0); if (near < 6) hitstop = Math.max(hitstop, 0.09); break;
       case 'heavyhit': { // 강공격: 폭발 + 이중 충격파 + 바닥 고리 + 화면 번쩍
-        burst(p, 0xff6a00, 40, 12); burst(p, 0xffe0a0, 16, 6); impact(p, 0xff7a2e, 2.6); impact(p, 0xffffff, 1.4);
-        shock(p, 0xffaa33, 1.6); shock(p, 0xff3355, 1.0);
-        const g = f.pos.clone(); g.y = 0.08; groundRing(g, 0xff7a2e);
+        burst(p, C(0xff6a00), 40, 12); burst(p, C(0xffe0a0), 16, 6); impact(p, C(0xff7a2e), 2.6); impact(p, 0xffffff, 1.4);
+        shock(p, C(0xffaa33), 1.6); shock(p, C(0xff3355), 1.0);
+        const g = f.pos.clone(); g.y = 0.08; groundRing(g, C(0xff7a2e));
         sfx.play('heavy', vol); f.flash(0xff5500);
         shake = Math.max(shake, 0.6); fovKick = Math.max(fovKick, near < 8 ? 7 : 0);
         if (near < 7) { hitstop = Math.max(hitstop, 0.15); screenFlash('orange'); } break;
@@ -2279,7 +2351,7 @@ const world = {
     shake = Math.max(shake, heavy ? 0.45 : mid ? 0.22 : 0.12);
     if (vic.remote) {
       const p = vic.pos.clone().lerp(att.pos, 0.35); p.y += 1.25;
-      impact(p, heavy ? 0xff7a2e : 0xffffff, heavy ? 1.6 : 0.8);
+      impact(p, hitCol(att, heavy ? 0xff7a2e : 0xffffff), heavy ? 1.6 : 0.8);
       sfx.play(heavy ? 'heavy' : mid ? 'mid' : 'hit', 0.8);
     }
   },
@@ -2293,10 +2365,27 @@ const world = {
     shock(p, 0xffffff, 2.5); burst(p, 0xffffff, 30, 10);
     if (f === me || k === me) {
       slowT = 0.9; fovKick = 8; screenFlash('white');
-      center(f === me ? (k ? 'K.O.' : 'RING OUT') : 'K.O.!', f === me ? 'ko' : 'win', 1700);
+      // 쓰러뜨린 사람이 K.O. 문구를 샀으면 그 문구가 양쪽 화면에 크게 뜸
+      const phrase = k ? (k === me ? myKo : koTexts.get(k.id)) || '' : '';
+      center(phrase || (f === me ? (k ? 'K.O.' : 'RING OUT') : 'K.O.!'), (f === me ? 'ko' : 'win') + (phrase ? ' phrase' : ''), phrase ? 2200 : 1700);
+      if (k === me && mode === 'practice') playWinPose();
     }
   },
+  // 도발/승리 포즈: 머리 위에 말이 뜸
+  onEmote(f) {
+    const e = EMOTES[f.move];
+    if (!e || !playing()) return;
+    popup(f, e.say, 'emote');
+    sfx.play('ui', world.volFor(f));
+  },
 };
+const HIT_FX = { h_gold: 0xffc83d, h_purple: 0xb45cff, h_rainbow: -1, h_sky: 0x6fd6ff };
+function hitCol(att, base) {
+  const c = att && HIT_FX[att.hitFx];
+  if (c === undefined) return base;
+  return c === -1 ? new THREE.Color().setHSL(Math.random(), 1, 0.6).getHex() : c; // 무지개: 터질 때마다 다른 색
+}
+function playWinPose() { if (me?.emote && me.state !== 'ko') me.startEmote(me.emote, world); }
 
 // ================= 입력 =================
 const keys = new Set(), pressed = new Set();
@@ -2358,9 +2447,10 @@ function cycleLock() {
 
 function readInput() {
   const k = (c) => keys.has(c), p = (c) => pressed.has(c);
-  const inp = { mx: 0, mz: 0, light: false, heavy: false, guard: false, guardPressed: false, jump: false, dodge: false, skill: false };
+  const inp = { mx: 0, mz: 0, light: false, heavy: false, guard: false, guardPressed: false, jump: false, dodge: false, skill: false, emote: false };
   if (!menuOpen && !(mode === 'online' && phase !== 'fight')) {
     inp.skill = p('KeyE') || !!touch.pressed.skill;
+    inp.emote = p('KeyT') || !!touch.pressed.emote;
     let f = (k('KeyW') || k('ArrowUp') ? 1 : 0) - (k('KeyS') || k('ArrowDown') ? 1 : 0) + touch.y;
     let r = (k('KeyD') || k('ArrowRight') ? 1 : 0) - (k('KeyA') || k('ArrowLeft') ? 1 : 0) + touch.x;
     const l = Math.hypot(f, r); if (l > 1) { f /= l; r /= l; }
@@ -2462,7 +2552,7 @@ function updateRoster() {
 function clearWorld() {
   for (const f of fighters.values()) f.dispose();
   fighters.clear(); bots = []; me = null; lockId = null; mode = null;
-  skills.clear(); ranked = false; clearTimeout(endTimer); setMap(false);
+  skills.clear(); koTexts.clear(); ranked = false; clearTimeout(endTimer); setMap(false);
   roomMeta = null; phase = 'lobby'; myReady = false; curRound = 0; lastRw = ''; lobbyEntry = null; world.noRespawn = false;
   $('#cutin').hidden = true;
   combo = 0; comboT = 0; $('#combo').classList.remove('show');
@@ -2497,6 +2587,8 @@ function makeMe(id, name) {
   me = new Fighter(scene, { id, name, color: COLORS[colorIdx], skin: equippedSkin() });
   me.respawn(); me.spawnProt = 0;
   me.hasSkill = !!mySkill; me.skillKey = equippedKey();
+  me.emote = equipped('pf_emote', 'e_').slice(2); me.hitFx = equipped('pf_hit', 'h_');
+  $('#tbtns [data-k="emote"]').hidden = !me.emote;
   if (mySkill) skills.set(id, mySkill);
   $('#tbtns [data-k="skill"]').hidden = !mySkill;
   fighters.set(id, me);
@@ -2588,7 +2680,11 @@ async function startOnline(code, create = null, quiet = false) {
           fighters.set(uid, f);
           feed(`${tag(f)} 입장`);
           const ks = SKILL_SLOTS.includes(s.ks) ? s.ks : 's1'; // 상대가 장착한 기술 칸
-          net.loadProfile(uid).then((p) => { const sk = skillIn(p, ks); if (sk && fighters.has(uid)) skills.set(uid, sk); }).catch(() => {});
+          net.loadProfile(uid).then((p) => {
+            if (!fighters.has(uid)) return;
+            const sk = skillIn(p, ks); if (sk) skills.set(uid, sk);
+            const ko = p.items?.ko ? cleanKo(p.koText) : ''; if (ko) koTexts.set(uid, ko);
+          }).catch(() => {});
           if (ranked && isHost()) net.cancelMatch(); // 매칭 상대가 들어옴 → 대기 슬롯 비우기
           syncLobby();
         }
@@ -2663,6 +2759,7 @@ function startRound(n) {
 function roundOver(uid) {
   phase = 'pause';
   const f = fighters.get(uid);
+  if (f === me) playWinPose();
   center(!f ? 'DRAW' : f === me ? 'ROUND WIN!' : `${f.name} 라운드 승리`, f === me ? 'win' : 'small', 2200);
 }
 
@@ -2671,6 +2768,7 @@ async function endGame(winner) {
   const w = fighters.get(winner), win = w === me;
   center(win ? (ranked ? `WIN! +${WIN_GOLD}G` : 'WIN!') : w ? `${w.name} 승리` : 'DRAW', win ? 'win' : 'ko', 3500);
   endTimer = setTimeout(leaveGame, 4500);
+  if (win) playWinPose();
   if (!(win && ranked)) return; // 골드는 실제 사람과의 매칭전 승리만
   try { gold = await net.addGold(WIN_GOLD); showGold(); syncRank(); }
   catch (e) { $('#err').textContent = '골드 저장 실패: ' + (e.code || e.message); }
@@ -2786,7 +2884,52 @@ function setProfile(p) {
   for (const k of SKILL_SLOTS) { const sk = skillIn(p, k); if (sk) mySkills[k] = sk; }
   mySkill = mySkills[equippedKey()] || null;
   ownedSkins = new Set([0, ...Object.keys(p.skins || {}).map((k) => parseInt(k.slice(1), 10)).filter((i) => PHOTO_SKINS[i])]);
-  showGold(); buildSkins(); buildMySkills(); syncRank();
+  myItems = p.items && typeof p.items === 'object' ? p.items : {};
+  myKo = owns('ko') ? cleanKo(p.koText) : '';
+  showGold(); buildSkins(); buildMySkills(); buildDeco(); syncRank();
+}
+// 상점 > 꾸미기: 한 줄에 [이름] [구매 / 장착 / 장착됨]
+function decoRow(box, id, label, storeKey, swatch) {
+  const own = owns(id), on = store.get(storeKey, '') === id && own;
+  const d = document.createElement('div');
+  d.className = 'list-row' + (on ? ' ready' : '');
+  d.innerHTML = (swatch ? '<i class="swatch"></i>' : '') + '<b></b><button class="btn"></button>';
+  if (swatch) d.querySelector('i').style.background = swatch;
+  d.querySelector('b').textContent = label;
+  const b = d.querySelector('button');
+  b.textContent = !own ? `${ITEM_PRICE(id)}G` : on ? '해제' : '장착';
+  b.onclick = async () => {
+    if (own) { store.set(storeKey, on ? '' : id); buildDeco(); shopErr(on ? '해제했어요.' : `${label} 장착!`); return; }
+    if (gold < ITEM_PRICE(id)) return shopErr(`골드가 부족해요 (${gold}/${ITEM_PRICE(id)}G)`);
+    try {
+      const { res, user: u } = await net.buyItem(id, ITEM_PRICE(id));
+      if (res === 'nogold') return shopErr('골드가 부족해요.');
+      if (storeKey) store.set(storeKey, id); // 사면 바로 장착
+      setProfile(u); shopErr(`${label} 구매 완료!`); sfx.ensure(); sfx.play('parry');
+    } catch (e) { shopErr('구매 실패: ' + errText(e)); }
+  };
+  box.appendChild(d);
+}
+function buildDeco() {
+  const em = $('#decoEmotes'), hi = $('#decoHits'), ko = $('#decoKo');
+  em.innerHTML = ''; hi.innerHTML = ''; ko.innerHTML = '';
+  for (const [k, e] of Object.entries(EMOTES)) decoRow(em, 'e_' + k, `${e.name} — "${e.say}"`, 'pf_emote');
+  for (const [id, name] of Object.entries(HIT_NAMES)) {
+    decoRow(hi, id, name, 'pf_hit', id === 'h_rainbow' ? 'linear-gradient(90deg,#f33,#fc3,#3f6,#3cf,#93f)' : '#' + HIT_FX[id].toString(16).padStart(6, '0'));
+  }
+  if (!owns('ko')) { decoRow(ko, 'ko', '내 K.O. 문구 만들기 (최대 12자)', ''); return; }
+  const d = document.createElement('div');
+  d.className = 'row';
+  d.innerHTML = '<input id="koInput" maxlength="12" autocomplete="off" aria-label="K.O. 문구"><button class="btn primary">저장</button>';
+  const inp = d.querySelector('input');
+  inp.value = myKo; inp.placeholder = '예: 참교육 완료';
+  d.querySelector('button').onclick = async () => {
+    const t = cleanKo(inp.value);
+    if (!t) return shopErr('문구를 1~12자로 써 주세요.');
+    try { await net.setKoText(t); myKo = t; shopErr(`저장했어요! 쓰러뜨리면 "${t}"`); }
+    catch (e) { shopErr('저장 실패: ' + errText(e)); }
+  };
+  ko.appendChild(d);
 }
 // 랭킹에 내 이름(닉네임)과 골드 올리기
 function syncRank() {
@@ -2820,10 +2963,13 @@ function buildMySkills() {
   $('#buySkill').hidden = full;
   if (full) box.insertAdjacentHTML('beforeend', '<p class="note">2개 다 찼어요. 하나를 삭제하면 새로 살 수 있어요.</p>');
 }
-function shopTab(skillsTab) {
-  $('#paneSkins').hidden = skillsTab; $('#paneSkills').hidden = !skillsTab;
-  $('#tabSkins').classList.toggle('on', !skillsTab); $('#tabSkills').classList.toggle('on', skillsTab);
-  $('#tabSkins').setAttribute('aria-selected', String(!skillsTab)); $('#tabSkills').setAttribute('aria-selected', String(skillsTab));
+function shopTab(name) {
+  for (const [tab, pane] of [['Skins', 'paneSkins'], ['Skills', 'paneSkills'], ['Deco', 'paneDeco']]) {
+    const on = tab === name;
+    $('#' + pane).hidden = !on;
+    $('#tab' + tab).classList.toggle('on', on);
+    $('#tab' + tab).setAttribute('aria-selected', String(on));
+  }
 }
 // 랭킹 화면: g = 골드, d = 누적 피해 (상위 10명)
 async function showRanks(key) {
@@ -2851,8 +2997,9 @@ $('#btnRank').onclick = () => { $('#rank').hidden = false; syncRank().then(() =>
 $('#btnRankClose').onclick = () => { $('#rank').hidden = true; };
 $('#rkGold').onclick = () => showRanks('g');
 $('#rkDmg').onclick = () => showRanks('d');
-$('#tabSkins').onclick = () => shopTab(false);
-$('#tabSkills').onclick = () => shopTab(true);
+$('#tabSkins').onclick = () => shopTab('Skins');
+$('#tabSkills').onclick = () => shopTab('Skills');
+$('#tabDeco').onclick = () => shopTab('Deco');
 async function loadProfile() {
   try {
     setProfile(await net.loadProfile());
@@ -2998,7 +3145,7 @@ $('#btnLogin').onclick = async () => {
 };
 $('#btnLogout').onclick = async () => {
   lobbyUnsub?.(); lobbyUnsub = null;
-  await net.signOut(); user = null; gold = 0; mySkill = null; mySkills = {}; ownedSkins = new Set([0]); buildSkins();
+  await net.signOut(); user = null; gold = 0; mySkill = null; mySkills = {}; myItems = {}; myKo = ''; ownedSkins = new Set([0]); buildSkins();
   $('#lobby').hidden = true; $('#btnLogin').hidden = false;
 };
 

@@ -70,6 +70,14 @@
             "$other": { ".validate": false }
           }
         },
+        "items": {
+          "$id": {
+            ".validate": "newData.val() === true && (data.exists() || newData.parent().parent().child('gold').val() <= data.parent().parent().child('gold').val() - ($id === 'ko' ? 300 : ($id.beginsWith('h_') ? 150 : 100)))"
+          }
+        },
+        "koText": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 12 && newData.parent().child('items').child('ko').val() === true"
+        },
         "skins": {
           "$id": {
             ".validate": "newData.val() === true && (data.exists() || newData.parent().parent().child('gold').val() <= data.parent().parent().child('gold').val() - 200)"
